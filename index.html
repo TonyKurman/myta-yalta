@@ -365,19 +365,16 @@
 ══════════════════════════════════════════════ -->
 <div class="bg-stage" id="stage">
   <!-- r4: epic aerial drone — hero & contact -->
-  <video id="vid-drone" class="bg-vid active" autoplay muted loop playsinline preload="auto" poster="assets/poster.jpg">
+  <video id="vid-drone" class="bg-vid active" muted playsinline preload="auto" poster="assets/poster.jpg">
     <source src="assets/r4-drone-epic.mp4" type="video/mp4">
   </video>
-  <!-- r1: night waterfall MYTA dive — manifesto -->
-  <video id="vid-night" class="bg-vid" muted loop playsinline preload="none">
+  <video id="vid-night" class="bg-vid" muted playsinline preload="auto">
     <source src="assets/r1-night-epic.mp4" type="video/mp4">
   </video>
-  <!-- r6: daytime waterfall orbit — project/infra -->
-  <video id="vid-waterfall" class="bg-vid" muted loop playsinline preload="none">
+  <video id="vid-waterfall" class="bg-vid" muted playsinline preload="auto">
     <source src="assets/r6-waterfall-epic.mp4" type="video/mp4">
   </video>
-  <!-- r5: sunset SPA swoop — location/gallery -->
-  <video id="vid-spa" class="bg-vid" muted loop playsinline preload="none">
+  <video id="vid-spa" class="bg-vid" muted playsinline preload="auto">
     <source src="assets/r5-spa-epic.mp4" type="video/mp4">
   </video>
 </div>
@@ -731,73 +728,87 @@
   var sheet  = document.getElementById('sheet');
   var label  = document.getElementById('sceneLabel');
 
-  /* ── VIDEO SWITCHING ── */
-  var scenes = {
-    'hero'      : { vid:'vid-drone',    txt:'Ялта · Аэросъёмка' },
-    'manifesto' : { vid:'vid-night',    txt:'Водопад MYTA · Синий час' },
-    'project'   : { vid:'vid-waterfall',txt:'Водопад · День' },
-    'infra'     : { vid:'vid-waterfall',txt:'Аквакомплекс MYTA' },
-    'location'  : { vid:'vid-spa',      txt:'SPA · Закат' },
-    'gallery'   : { vid:'vid-spa',      txt:'SPA · Закат' },
-    'contact'   : { vid:'vid-drone',    txt:'MYTA · Ялта' }
-  };
+  /* ── SCROLL-DRIVEN VIDEO SCRUBBING ── */
+  /* Зоны: группы секций → один видеоклип. Скролл вниз = перемотка вперёд, вверх = назад */
+  var zones = [
+    { vid:'vid-drone',     sections:['hero'],                           label:'Ялта · Аэросъёмка' },
+    { vid:'vid-night',     sections:['manifesto'],                      label:'Водопад MYTA · Синий час' },
+    { vid:'vid-waterfall', sections:['project','infra'],                label:'Водопад · День' },
+    { vid:'vid-spa',       sections:['location','gallery','interiors'], label:'SPA · Закат' },
+    { vid:'vid-drone',     sections:['contact'],                        label:'MYTA · Ялта' }
+  ];
+
+  /* вычисляем абсолютный offsetTop через цепочку offsetParent */
+  function absTop(el){ var t=0; while(el){t+=el.offsetTop;el=el.offsetParent;} return t; }
+
+  /* кэш координат зон — пересчитываем при ресайзе */
+  var zoneCache = [];
+  function buildCache(){
+    zoneCache = zones.map(function(z){
+      var tops=[], bots=[];
+      z.sections.forEach(function(id){
+        var el=document.getElementById(id); if(!el) return;
+        var t=absTop(el); tops.push(t); bots.push(t+el.offsetHeight);
+      });
+      if(!tops.length) return null;
+      return { z:z, top:Math.min.apply(null,tops), bot:Math.max.apply(null,bots) };
+    }).filter(Boolean);
+  }
+  buildCache();
+  addEventListener('resize', buildCache, {passive:true});
 
   var activeVid = 'vid-drone';
+  var rAF = null;
 
-  function switchScene(sectionId) {
-    var sc = scenes[sectionId];
-    if (!sc || sc.vid === activeVid) return;
-    activeVid = sc.vid;
+  function scrub(){
+    var y=scrollY, vh=innerHeight;
 
-    document.querySelectorAll('.bg-vid').forEach(function(v){
-      v.classList.remove('active');
+    /* зона с максимальным перекрытием с вьюпортом */
+    var best=null, bestScore=-1;
+    zoneCache.forEach(function(zb){
+      var score = Math.max(0, Math.min(y+vh, zb.bot) - Math.max(y, zb.top));
+      if(score > bestScore){ bestScore=score; best=zb; }
     });
-    var next = document.getElementById(sc.vid);
-    if (next) {
-      next.classList.add('active');
-      if (next.paused) { next.load(); next.play().catch(function(){}); }
+
+    if(best){
+      var vid = document.getElementById(best.z.vid);
+
+      /* переключаем активное видео с кроссфейдом */
+      if(best.z.vid !== activeVid){
+        document.querySelectorAll('.bg-vid').forEach(function(v){ v.classList.remove('active'); });
+        if(vid) vid.classList.add('active');
+        activeVid = best.z.vid;
+        label.classList.remove('visible');
+        setTimeout(function(){ label.textContent=best.z.label; label.classList.add('visible'); },400);
+        clearTimeout(label._t);
+        label._t = setTimeout(function(){ label.classList.remove('visible'); },3200);
+      }
+
+      /* скрабируем: progress 0→1 по высоте зоны → currentTime */
+      if(vid && vid.readyState >= 1 && vid.duration){
+        var progress = (y + vh*0.5 - best.top) / (best.bot - best.top);
+        progress = Math.max(0, Math.min(1, progress));
+        var target = progress * vid.duration;
+        if(Math.abs(vid.currentTime - target) > 0.04) vid.currentTime = target;
+      }
     }
 
-    /* scene label */
-    label.style.opacity = '0';
-    setTimeout(function(){
-      label.textContent = sc.txt;
-      label.classList.add('visible');
-    }, 400);
-    clearTimeout(label._t);
-    label._t = setTimeout(function(){ label.classList.remove('visible'); }, 3200);
-  }
-
-  /* observe each section */
-  var sectionObs = new IntersectionObserver(function(entries){
-    entries.forEach(function(e){
-      if (e.isIntersecting) switchScene(e.target.id);
-    });
-  }, { threshold: 0.35 });
-
-  Object.keys(scenes).forEach(function(id){
-    var el = document.getElementById(id);
-    if (el) sectionObs.observe(el);
-  });
-
-  /* ── SCROLL: hero — видео яркое, veil лёгкий ── */
-  function onScroll(){
-    var vh = innerHeight, y = scrollY;
-    var t = Math.min(y / (vh * 0.9), 1); // 0→1 через герой
-
-    if (!reduce) {
-      /* brightness: 0.88 → 0.96 (видео всегда хорошо видно) */
+    /* яркость + виньетка на герое */
+    var t = Math.min(y/(vh*0.9), 1);
+    if(!reduce){
       document.querySelectorAll('.bg-vid').forEach(function(v){
-        v.style.filter = 'brightness(' + (0.88 + 0.08*t).toFixed(2) + ')';
+        v.style.filter = 'brightness('+(0.88+0.08*t).toFixed(2)+')';
       });
-      /* veil: 0.38 → 0.18 (лёгкая виньетка, не гасит видео) */
-      veil.style.opacity = (0.38 - 0.20 * t).toFixed(2);
+      veil.style.opacity = (0.38-0.20*t).toFixed(2);
     }
-
-    nav.classList.toggle('solid', y > 40);
+    nav.classList.toggle('solid', y>40);
   }
-  addEventListener('scroll', onScroll, {passive:true});
-  onScroll();
+
+  addEventListener('scroll', function(){
+    if(rAF) cancelAnimationFrame(rAF);
+    rAF = requestAnimationFrame(scrub);
+  }, {passive:true});
+  scrub();
 
   /* ── SHEET RISE: appears when scrolled past hero ── */
   var sheetObs = new IntersectionObserver(function(entries){
