@@ -1031,15 +1031,19 @@
       formBtn.textContent = 'Отправляем…';
 
       var goal = document.getElementById('f-goal').value;
-      var fd = new FormData();
-      fd.append('name', name);
-      fd.append('phone', phone);
-      fd.append('goal', goal);
 
-      fetch('send.php', { method: 'POST', body: fd })
+      fetch('https://formsubmit.co/ajax/kurman@otp.msk.ru', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+        body: JSON.stringify({
+          name: name, phone: phone, goal: goal,
+          _subject: 'Новая заявка — MYTA Ялта',
+          _template: 'table'
+        })
+      })
         .then(function(r){ return r.json(); })
         .then(function(data){
-          if (data.ok) {
+          if (data.success === 'true' || data.success === true) {
             leadForm.style.display = 'none';
             formSuccess.style.display = 'block';
           } else {
