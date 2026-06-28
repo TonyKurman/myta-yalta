@@ -36,7 +36,7 @@
 
 <div class="wrap">
   <h1>Правила возврата</h1>
-  <div class="date">Дата вступления в силу: 01 января 2025 г.</div>
+  <div class="date">Дата вступления в силу: 28 июня 2026 г.</div>
 
   <div class="note">
     Настоящие правила распространяются на информационно-консультационные услуги ООО «К-риэлти плюс». Условия возврата денежных средств по договорам купли-продажи или долевого участия регулируются соответствующими договорами и законодательством РФ.
@@ -87,11 +87,22 @@
   <div class="company">
     <b>ООО «К-риэлти плюс»</b>
     295000, Республика Крым, г. Симферополь, ул. Пушкина, зд. 9А, помещ. 11<br>
-    Телефон: <a href="tel:+74955684616">+7 (495) 568-46-16</a><br>
+    Телефон: <a href="tel:+79690490901">+7 (969) 049-09-01</a><br>
+    Telegram: <a href="https://t.me/tonykurman">@tonykurman</a><br>
+    Email: <span class="eml-protect" data-u="kurman" data-d="otp.msk.ru"></span><br>
     Режим работы: ежедневно с 9:00 до 21:00
   </div>
 </div>
 
 <footer>© 2026 ООО «К-риэлти плюс» · ИНН 9102297685 · ОГРН 1249100009069</footer>
+<script>
+document.querySelectorAll('.eml-protect').forEach(function(el){
+  var u=el.getAttribute('data-u'), d=el.getAttribute('data-d');
+  var a=document.createElement('a');
+  a.href='mai'+'lto:'+u+'@'+d;
+  a.textContent=u+'@'+d;
+  el.parentNode.replaceChild(a,el);
+});
+</script>
 </body>
 </html>
